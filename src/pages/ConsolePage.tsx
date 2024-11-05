@@ -151,14 +151,14 @@ export function ConsolePage() {
     await wavStreamPlayer.connect();
 
     // Set voice to Ash
-    client.updateSession({ voice: 'alloy' });
+    client.updateSession({ voice: 'shimmer' });
 
     // Connect to realtime API
     await client.connect();
     client.sendUserMessageContent([
       {
         type: `input_text`,
-        text: `Привет, мне нужна твоя помощь!`,
+        text: `Hi, my name is Olya. I'm a chef. Tell me about yourself and how you can help me!`,
       },
     ]);
 
