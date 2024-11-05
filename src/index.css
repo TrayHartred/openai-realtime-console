@@ -12,6 +12,7 @@ body {
   color: #18181b;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #202123;
 }
 
 #root {

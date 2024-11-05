@@ -2,12 +2,14 @@
   font-family: 'Roboto Mono', monospace;
   font-weight: 400;
   font-style: normal;
-  font-size: 12px;
+  font-size: 13px;
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   margin: 0px 8px;
+  color: white;
+  background-color: #202123;
   & > div {
     flex-shrink: 0;
   }
@@ -15,7 +17,10 @@
   .spacer {
     flex-grow: 1;
   }
+  .content-api-key {
+    display: none;
 
+  }
   .content-top {
     display: flex;
     align-items: center;
@@ -25,6 +30,7 @@
       flex-grow: 1;
       display: flex;
       align-items: center;
+      justify-content: space-evenly;
       gap: 12px;
       img {
         width: 24px;
@@ -116,6 +122,7 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      justify-content: space-between;
       & > div {
         flex-grow: 1;
       }
@@ -125,7 +132,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 16px;
+        padding: 16px 0;
       }
       & > div.events {
         overflow: hidden;
@@ -188,7 +195,7 @@
       }
     }
     .speaker-content {
-      color: #18181b;
+      color: white;
       overflow: hidden;
       word-wrap: break-word;
     }
@@ -211,7 +218,7 @@
     .event-details {
       display: flex;
       flex-direction: column;
-      color: #18181b;
+      color: white;
       gap: 8px;
       .event-summary {
         padding: 4px 8px;
@@ -274,6 +281,15 @@
         width: 100%;
         height: 100%;
         color: currentColor;
+      }
+    }
+  }
+
+  [data-component='Button'] {
+    &[data-style='action'] {
+      background-color: #1a7f64;
+      &:hover {
+        background-color: darken(#1a7f64, 5%);
       }
     }
   }
