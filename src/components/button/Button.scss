@@ -2,7 +2,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Roboto Mono', monospace;
+  font-family: helvetica, sans-serif;
   font-size: 12px;
   font-optical-sizing: auto;
   font-weight: 400;
@@ -17,10 +17,10 @@
   outline: none;
 
   &.button-style-action {
-    background-color: #101010;
+    background-color: #1a7f64;
     color: #ececf1;
     &:hover:not([disabled]) {
-      background-color: #404040;
+      background-color: #10a37f;
     }
   }
 

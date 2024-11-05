@@ -150,13 +150,15 @@ export function ConsolePage() {
     // Connect to audio output
     await wavStreamPlayer.connect();
 
+    // Set voice to Ash
+    client.updateSession({ voice: 'alloy' });
+
     // Connect to realtime API
     await client.connect();
     client.sendUserMessageContent([
       {
         type: `input_text`,
-        text: `Hello!`,
-        // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+        text: `Привет, мне нужна твоя помощь!`,
       },
     ]);
 
@@ -380,9 +382,17 @@ export function ConsolePage() {
               </div>
             </div>
           <div className="content-block conversation">
-            <div className="content-block-title">conversation</div>
             <div className="content-block-body" data-conversation-content>
-              {!items.length && `awaiting connection...`}
+              {!items.length && (
+                <div className="empty-state">
+                  <div className="waveform-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 3V21M9 6V18M6 8V16M3 11V13M15 4V20M18 7V17M21 9V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div>Conversation will appear here</div>
+                </div>
+              )}
               {items.map((conversationItem, i) => {
                 return (
                   <div className="conversation-item" key={conversationItem.id}>

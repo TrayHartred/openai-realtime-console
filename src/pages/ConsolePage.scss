@@ -69,6 +69,20 @@
         &.full {
           padding: 0px;
         }
+
+        .empty-state {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 16px;
+          color: #8e8ea0;
+          
+          .waveform-icon {
+            opacity: 0.5;
+          }
+        }
       }
     }
     .content-right {
@@ -145,9 +159,8 @@
         flex-shrink: 0;
         width: 100%;
         overflow: hidden;
-        height: 200px;
+
         min-height: 0;
-        max-height: 200px;
         border-top: 1px solid #e7e7e7;
       }
     }
