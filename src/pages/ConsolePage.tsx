@@ -34,6 +34,7 @@ interface RealtimeEvent {
   event: { [key: string]: any };
 }
 
+
 export function ConsolePage() {
   /**
    * Ask user for API Key
@@ -151,14 +152,14 @@ export function ConsolePage() {
     await wavStreamPlayer.connect();
 
     // Set voice to Ash
-    client.updateSession({ voice: 'shimmer' });
+    client.updateSession({ voice: 'ash' });
 
     // Connect to realtime API
     await client.connect();
     client.sendUserMessageContent([
       {
         type: `input_text`,
-        text: `Hi, my name is Olya. I'm a chef. Tell me about yourself and how you can help me!`,
+        text: ``,
       },
     ]);
 
