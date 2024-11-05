@@ -1,20 +1,21 @@
 [data-component='Button'] {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-family: helvetica, sans-serif;
-  font-size: 12px;
+  gap: 10px;
+  font-family: "Roboto Mono", monospace;
+  font-size: 14px;
   font-optical-sizing: auto;
-  font-weight: 400;
+  font-weight: 500;
   font-style: normal;
   border: none;
   background-color: #ececf1;
   color: #101010;
-  border-radius: 1000px;
-  padding: 8px 24px;
+  border-radius: 12px;
+  padding: 6px 24px 8px;
   min-height: 42px;
   transition: transform 0.1s ease-in-out, background-color 0.1s ease-in-out;
   outline: none;
+
 
   &.button-style-action {
     background-color: #1a7f64;
