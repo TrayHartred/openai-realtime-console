@@ -572,6 +572,7 @@ export function ConsolePage() {
                     disabled={!isConnected || !canPushToTalk}
                     onClick={toggleRecording}
                     label={isRecording ? `${recordingTime}s` : 'Record'}
+                    className={`record-button ${isRecording ? 'recording' : ''}`}
                   />
                 )}
               </>
@@ -582,6 +583,7 @@ export function ConsolePage() {
               onClick={isConnected ? disconnectConversation : connectConversation}
               label={isConnecting ? 'Connecting...' : (isConnected ? 'End session' : 'Talk to Oracle')}
               disabled={isConnecting}
+              className={isConnected ? 'disconnect-button' : 'connect-button'}
             />
           </div>
         </div>
