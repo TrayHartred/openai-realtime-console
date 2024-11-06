@@ -98,6 +98,7 @@ export function ConsolePage() {
   const [isConnected, setIsConnected] = useState(false);
   const [canPushToTalk, setCanPushToTalk] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [textInput, setTextInput] = useState('');
 
   /**
    * Utility for formatting the timing of logs
@@ -401,6 +402,28 @@ export function ConsolePage() {
     setCanPushToTalk(value === 'none');
   };
 
+  const sendTextMessage = async () => {
+    if (!textInput.trim()) return;
+    
+    const client = clientRef.current;
+    const wavStreamPlayer = wavStreamPlayerRef.current;
+
+    // Interrupt any playing audio
+    const trackSampleOffset = await wavStreamPlayer.interrupt();
+    if (trackSampleOffset?.trackId) {
+      const { trackId, offset } = trackSampleOffset;
+      await client.cancelResponse(trackId, offset);
+    }
+
+    // Send text message using sendUserMessageContent
+    await client.sendUserMessageContent([{ 
+      type: 'input_text',
+      text: textInput 
+    }]);
+    
+    setTextInput(''); // Clear input after sending
+  };
+
   /**
    * Render the application
    */
@@ -499,25 +522,41 @@ export function ConsolePage() {
             </div>
           </div>
           <div className="content-actions">
-            {isConnected && canPushToTalk && (
-              <>
-                <Button
-                  label={isRecording ? 'release to send' : 'push to talk'}
-                  buttonStyle={isRecording ? 'alert' : 'regular'}
-                  disabled={!isConnected || !canPushToTalk}
-                  onMouseDown={startRecording}
-                  onMouseUp={stopRecording}
-                  onMouseLeave={() => isRecording && stopRecording()}
+            {isConnected && (
+              <div className="input-container">
+                <input
+                  type="text"
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendTextMessage()}
+                  placeholder="Type a message..."
+                  disabled={!isConnected}
                 />
-                <div className="spacer" />
-              </>
+                <div className="action-buttons">
+                  <Button
+                    icon={ArrowUp}
+                    buttonStyle="regular"
+                    disabled={!isConnected || !textInput.trim()}
+                    onClick={sendTextMessage}
+                  />
+                  {canPushToTalk && (
+                    <Button
+                      icon={Mic}
+                      buttonStyle={isRecording ? 'alert' : 'regular'}
+                      disabled={!isConnected || !canPushToTalk}
+                      onMouseDown={startRecording}
+                      onMouseUp={stopRecording}
+                      onMouseLeave={() => isRecording && stopRecording()}
+                    />
+                  )}
+                </div>
+              </div>
             )}
             <Button
-              label={isConnected ? 'End session' : 'Start cooking'}
-              iconPosition={isConnected ? 'end' : 'start'}
               icon={isConnected ? X : Zap}
               buttonStyle={isConnected ? 'regular' : 'action'}
               onClick={isConnected ? disconnectConversation : connectConversation}
+              label={isConnected ? 'End session' : 'Start cooking'}
             />
           </div>
         </div>
