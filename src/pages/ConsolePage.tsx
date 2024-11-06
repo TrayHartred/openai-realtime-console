@@ -35,6 +35,91 @@ interface RealtimeEvent {
   event: { [key: string]: any };
 }
 
+// Функция для форматирования памяти в строку контекста
+const getMemoryContext = (memory: {[key: string]: string[]}) => {
+  if (Object.keys(memory).length === 0) return '';
+  
+  const memoryItems = Object.entries(memory)
+    .map(([key, values]) => `${key}: ${values.join(', ')}`)
+    .join('\n');
+  
+  return `
+Here is what I remember about our previous conversations:
+${memoryItems}
+
+Please use this information in our conversation when relevant.
+`;
+};
+
+// Изменим тип и инициализацию состояния memory
+interface Memory {
+  [key: string]: string[];
+}
+
+// Определим тип для функции setMemory
+type SetMemoryFunction = React.Dispatch<React.SetStateAction<Memory>>;
+
+// Определим тип для функции updateContext
+type UpdateContextFunction = (memory: Memory) => void;
+
+// В начале компонента, после объявления интерфейсов
+const setupClientTools = (
+  client: RealtimeClient, 
+  setMemory: SetMemoryFunction, 
+  updateContext: UpdateContextFunction
+) => {
+  client.addTool(
+    {
+      name: 'set_memory',
+      description: 'Stores information in memory that can be recalled later',
+      parameters: {
+        type: 'object',
+        properties: {
+          key: {
+            type: 'string',
+            description: 'Key to store the information under'
+          },
+          value: {
+            type: 'string',
+            description: 'Information to remember'
+          }
+        },
+        required: ['key', 'value']
+      }
+    },
+    async ({ key, value }: { key: string; value: string }) => {
+      setMemory((prev: Memory) => {
+        const prevValues = prev[key] || [];
+        const newMemory = {
+          ...prev,
+          [key]: [...prevValues, value]
+        };
+        localStorage.setItem('oracle_memory', JSON.stringify(newMemory));
+        updateContext(newMemory);
+        return newMemory;
+      });
+      return '';
+    }
+  );
+
+  client.addTool(
+    {
+      name: 'clear_memory',
+      description: 'Clears all stored memory',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: []
+      }
+    },
+    async () => {
+      setMemory({});
+      localStorage.removeItem('oracle_memory');
+      updateContext({});
+      return '';
+    }
+  );
+};
 
 export function ConsolePage() {
   /**
@@ -102,6 +187,35 @@ export function ConsolePage() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingInterval, setRecordingInterval] = useState<NodeJS.Timeout | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [memory, setMemory] = useState<Memory>(() => {
+    try {
+      const savedMemory = localStorage.getItem('oracle_memory');
+      if (!savedMemory) return {};
+      
+      const parsed = JSON.parse(savedMemory);
+      const normalized: Memory = {};
+      Object.entries(parsed).forEach(([key, value]) => {
+        normalized[key] = Array.isArray(value) ? value : [value];
+      });
+      return normalized;
+    } catch (e) {
+      console.error('Failed to parse memory:', e);
+      return {};
+    }
+  });
+
+  // Определяем updateContext до его использования
+  const updateContext = useCallback((memory: Memory) => {
+    const memoryContext = getMemoryContext(memory);
+    clientRef.current.updateSession({ 
+      instructions: instructions + (memoryContext ? `\n\n${memoryContext}` : '')
+    });
+  }, []);
+
+  // Инициализируем инструменты после создания всех необходимых состояний
+  useEffect(() => {
+    setupClientTools(clientRef.current, setMemory, updateContext);
+  }, [updateContext]);
 
   /**
    * Utility for formatting the timing of logs
@@ -148,6 +262,9 @@ export function ConsolePage() {
       const wavRecorder = wavRecorderRef.current;
       const wavStreamPlayer = wavStreamPlayerRef.current;
 
+      // Обновляем контекст с текущей памятью
+      updateContext(memory);
+
       // Set state variables
       startTimeRef.current = new Date().toISOString();
       setRealtimeEvents([]);
@@ -158,7 +275,6 @@ export function ConsolePage() {
 
       // Connect to audio output
       await wavStreamPlayer.connect();
-
       // @ts-ignore - OpenAI Realtime API Beta types are outdated and don't include all available voices.
       // 'ash' is a valid voice option according to the latest API but not yet reflected in the type definitions
       client.updateSession({ voice: 'ash' });
@@ -172,11 +288,10 @@ export function ConsolePage() {
       setIsConnected(true);
     } catch (error) {
       console.error('Connection failed:', error);
-      // Optionally show error to user
     } finally {
       setIsConnecting(false);
     }
-  }, []);
+  }, [memory, updateContext]);
 
   /**
    * Disconnect and reset conversation state
@@ -474,14 +589,14 @@ export function ConsolePage() {
       </div>
       <div className="content-main">
         <div className="content-logs">
-        <div className="visualization">
-              <div className="visualization-entry client">
-                <canvas ref={clientCanvasRef} />
-              </div>
-              <div className="visualization-entry server">
-                <canvas ref={serverCanvasRef} />
-              </div>
+          <div className="visualization">
+            <div className="visualization-entry client">
+              <canvas ref={clientCanvasRef} />
             </div>
+            <div className="visualization-entry server">
+              <canvas ref={serverCanvasRef} />
+            </div>
+          </div>
           <div className="content-block conversation">
             <div className="content-block-body" data-conversation-content>
               {!items.length && (
