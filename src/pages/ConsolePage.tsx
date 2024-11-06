@@ -99,6 +99,9 @@ export function ConsolePage() {
   const [canPushToTalk, setCanPushToTalk] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [textInput, setTextInput] = useState('');
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingInterval, setRecordingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   /**
    * Utility for formatting the timing of logs
@@ -138,31 +141,40 @@ export function ConsolePage() {
    * WavRecorder taks speech input, WavStreamPlayer output, client is API client
    */
   const connectConversation = useCallback(async () => {
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    const wavStreamPlayer = wavStreamPlayerRef.current;
+    setIsConnecting(true);
+    
+    try {
+      const client = clientRef.current;
+      const wavRecorder = wavRecorderRef.current;
+      const wavStreamPlayer = wavStreamPlayerRef.current;
 
-    // Set state variables
-    startTimeRef.current = new Date().toISOString();
-    setIsConnected(true);
-    setRealtimeEvents([]);
-    setItems(client.conversation.getItems());
+      // Set state variables
+      startTimeRef.current = new Date().toISOString();
+      setRealtimeEvents([]);
+      setItems(client.conversation.getItems());
 
-    // Connect to microphone
-    await wavRecorder.begin();
+      // Connect to microphone
+      await wavRecorder.begin();
 
-    // Connect to audio output
-    await wavStreamPlayer.connect();
+      // Connect to audio output
+      await wavStreamPlayer.connect();
 
-    // Set voice to Ash
-    client.updateSession({ voice: 'ash' });
+      // Set voice to Ash
+      client.updateSession({ voice: 'ash' });
 
-    // Connect to realtime API
-    await client.connect();
+      // Connect to realtime API
+      await client.connect();
 
-    // Automatically set to manual mode
-    client.updateSession({ turn_detection: null });
-    setCanPushToTalk(true);
+      // Automatically set to manual mode
+      client.updateSession({ turn_detection: null });
+      setCanPushToTalk(true);
+      setIsConnected(true);
+    } catch (error) {
+      console.error('Connection failed:', error);
+      // Optionally show error to user
+    } finally {
+      setIsConnecting(false);
+    }
   }, []);
 
   /**
@@ -352,32 +364,46 @@ export function ConsolePage() {
    * In push-to-talk mode, start recording
    * .appendInputAudio() for each sample
    */
-  const startRecording = async () => {
-    setIsRecording(true);
+  const toggleRecording = async () => {
     const client = clientRef.current;
     const wavRecorder = wavRecorderRef.current;
     const wavStreamPlayer = wavStreamPlayerRef.current;
-    
-    // Interrupt any playing audio
-    const trackSampleOffset = await wavStreamPlayer.interrupt();
-    if (trackSampleOffset?.trackId) {
-      const { trackId, offset } = trackSampleOffset;
-      await client.cancelResponse(trackId, offset);
-    }
-    
-    // Start recording
-    await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-  };
 
-  /**
-   * In push-to-talk mode, stop recording
-   */
-  const stopRecording = async () => {
-    setIsRecording(false);
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    await wavRecorder.pause();
-    client.createResponse();
+    if (!isRecording) {
+      // Start recording
+      setIsRecording(true);
+      
+      // Interrupt any playing audio
+      const trackSampleOffset = await wavStreamPlayer.interrupt();
+      if (trackSampleOffset?.trackId) {
+        const { trackId, offset } = trackSampleOffset;
+        await client.cancelResponse(trackId, offset);
+      }
+      
+      // Start recording
+      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+      
+      // Start timer
+      setRecordingTime(0);
+      const interval = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      setRecordingInterval(interval);
+    } else {
+      // Stop recording
+      setIsRecording(false);
+      
+      // Clear timer
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+        setRecordingInterval(null);
+      }
+      setRecordingTime(0);
+      
+      // Stop recording and send message
+      await wavRecorder.pause();
+      client.createResponse();
+    }
   };
 
   /**
@@ -522,41 +548,41 @@ export function ConsolePage() {
             </div>
           </div>
           <div className="content-actions">
-            {isConnected && (
-              <div className="input-container">
-                <input
-                  type="text"
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendTextMessage()}
-                  placeholder="Type a message..."
-                  disabled={!isConnected}
-                />
-                <div className="action-buttons">
+            {isConnected && !isConnecting && (
+              <>
+                <div className="input-container">
+                  <input
+                    type="text"
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendTextMessage()}
+                    placeholder="Type a message..."
+                    disabled={!isConnected}
+                  />
                   <Button
                     icon={ArrowUp}
                     buttonStyle="regular"
                     disabled={!isConnected || !textInput.trim()}
                     onClick={sendTextMessage}
                   />
-                  {canPushToTalk && (
-                    <Button
-                      icon={Mic}
-                      buttonStyle={isRecording ? 'alert' : 'regular'}
-                      disabled={!isConnected || !canPushToTalk}
-                      onMouseDown={startRecording}
-                      onMouseUp={stopRecording}
-                      onMouseLeave={() => isRecording && stopRecording()}
-                    />
-                  )}
                 </div>
-              </div>
+                {canPushToTalk && (
+                  <Button
+                    icon={Mic}
+                    buttonStyle={isRecording ? 'alert' : 'regular'}
+                    disabled={!isConnected || !canPushToTalk}
+                    onClick={toggleRecording}
+                    label={isRecording ? `${recordingTime}s` : 'Record'}
+                  />
+                )}
+              </>
             )}
             <Button
-              icon={isConnected ? X : Zap}
+              icon={isConnecting ? undefined : (isConnected ? X : Zap)}
               buttonStyle={isConnected ? 'regular' : 'action'}
               onClick={isConnected ? disconnectConversation : connectConversation}
-              label={isConnected ? 'End session' : 'Start cooking'}
+              label={isConnecting ? 'Connecting...' : (isConnected ? 'End session' : 'Talk to Oracle')}
+              disabled={isConnecting}
             />
           </div>
         </div>
