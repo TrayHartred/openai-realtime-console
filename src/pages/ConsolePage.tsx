@@ -495,23 +495,22 @@ export function ConsolePage() {
               )}
               {items.map((conversationItem, i) => {
                 return (
-                  <div className="conversation-item" key={conversationItem.id}>
-                    <div className={`speaker ${conversationItem.role || ''}`}>
+                  <div 
+                    className={`conversation-item ${conversationItem.role || ''}`} 
+                    key={conversationItem.id}
+                  >
+                    <div className="speaker">
                       <div>
-                        {(
-                          conversationItem.role || conversationItem.type
-                        ).replaceAll('_', ' ')}
+                        {(conversationItem.role || conversationItem.type).replaceAll('_', ' ')}
                       </div>
                       <div
                         className="close"
-                        onClick={() =>
-                          deleteConversationItem(conversationItem.id)
-                        }
+                        onClick={() => deleteConversationItem(conversationItem.id)}
                       >
                         <X />
                       </div>
                     </div>
-                    <div className={`speaker-content`}>
+                    <div className="speaker-content">
                       {/* tool response */}
                       {conversationItem.type === 'function_call_output' && (
                         <div>{conversationItem.formatted.output}</div>

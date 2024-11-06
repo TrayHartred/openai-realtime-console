@@ -31,6 +31,7 @@
       display: flex;
       align-items: center;
       justify-content: space-evenly;
+      font-size: 14px;
       gap: 12px;
       img {
         width: 24px;
@@ -313,9 +314,7 @@
         flex-shrink: 0;
         width: 100%;
         overflow: hidden;
-
         min-height: 0;
-        border-top: 1px solid #e7e7e7;
       }
     }
   }
@@ -323,48 +322,73 @@
   .conversation-item {
     position: relative;
     display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
-    &:not(:hover) .close {
+    flex-direction: column;
+    margin-bottom: 20px;
+    padding: 0 16px;
+    gap: 0;
+
+    .speaker {
       display: none;
     }
+
+    .speaker-content {
+      max-width: 80%;
+      word-wrap: break-word;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    &.user {
+      align-items: flex-end;
+
+      .speaker-content {
+        background: white;
+        color: #202123;
+        padding: 12px 16px;
+        border-radius: 18px;
+        border-bottom-right-radius: 4px;
+        margin-left: auto;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+    }
+
+    &.assistant {
+      align-items: flex-start;
+
+      .speaker-content {
+        color: rgba(255, 255, 255, 0.9);
+        padding: 4px 8px;
+        margin-right: auto;
+      }
+    }
+
     .close {
       position: absolute;
-      top: 0px;
-      right: -20px;
-      background: #aaa;
+      top: 50%;
+      transform: translateY(-50%);
+      right: 20px;
+      background: rgba(255, 255, 255, 0.1);
       color: #fff;
       display: flex;
-      border-radius: 16px;
-      padding: 2px;
+      border-radius: 50%;
+      padding: 4px;
       cursor: pointer;
-      &:hover {
-        background: #696969;
-      }
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: 1;
+      
       svg {
-        stroke-width: 3;
-        width: 12px;
-        height: 12px;
+        width: 14px;
+        height: 14px;
+      }
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.2);
       }
     }
-    .speaker {
-      position: relative;
-      text-align: left;
-      gap: 16px;
-      width: 80px;
-      flex-shrink: 0;
-      margin-right: 16px;
-      &.user {
-        color: #0099ff;
-      }
-      &.assistant {
-        color: #009900;
-      }
-    }
-    .speaker-content {
-      color: white;
-      overflow: hidden;
-      word-wrap: break-word;
+
+    &:hover .close {
+      opacity: 1;
     }
   }
 
