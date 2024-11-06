@@ -646,7 +646,9 @@
           display: block; // Показываем лейбл для Talk to Oracle
         }
       }
-
+      .icon.icon-start {
+        margin-left: 0;
+    }
       // Стили для кнопки отключения
       .disconnect-button {
         .label {

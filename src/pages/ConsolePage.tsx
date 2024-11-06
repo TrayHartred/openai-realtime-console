@@ -68,57 +68,96 @@ const setupClientTools = (
   setMemory: SetMemoryFunction, 
   updateContext: UpdateContextFunction
 ) => {
-  client.addTool(
-    {
-      name: 'set_memory',
-      description: 'Stores information in memory that can be recalled later',
-      parameters: {
-        type: 'object',
-        properties: {
-          key: {
-            type: 'string',
-            description: 'Key to store the information under'
+  try {
+    client.addTool(
+      {
+        name: 'set_memory',
+        description: 'Stores information in memory that can be recalled later',
+        parameters: {
+          type: 'object',
+          properties: {
+            key: {
+              type: 'string',
+              description: 'Category of information (e.g., name, goals, preferences, planned_trips)'
+            },
+            value: {
+              type: 'string',
+              description: 'Information to remember'
+            }
           },
-          value: {
-            type: 'string',
-            description: 'Information to remember'
+          required: ['key', 'value']
+        }
+      },
+      async ({ key, value }: { key: string; value: string }) => {
+        try {
+          // Нормализуем ключ
+          const normalizedKey = key.toLowerCase().trim();
+          
+          // Нормализуем значение
+          const normalizedValue = value.trim();
+          
+          // Проверяем валидность данных
+          if (!normalizedKey || !normalizedValue) {
+            return 'Error: Invalid key or value provided';
           }
-        },
-        required: ['key', 'value']
-      }
-    },
-    async ({ key, value }: { key: string; value: string }) => {
-      setMemory((prev: Memory) => {
-        const prevValues = prev[key] || [];
-        const newMemory = {
-          ...prev,
-          [key]: [...prevValues, value]
-        };
-        localStorage.setItem('oracle_memory', JSON.stringify(newMemory));
-        updateContext(newMemory);
-        return newMemory;
-      });
-      return '';
-    }
-  );
 
-  client.addTool(
-    {
-      name: 'clear_memory',
-      description: 'Clears all stored memory',
-      parameters: {
-        type: 'object',
-        properties: {},
-        required: []
+          setMemory((prev: Memory) => {
+            // Получаем текущие значения для этого ключа
+            const prevValues = prev[normalizedKey] || [];
+            
+            // Проверяем, не существует ли уже такое значение
+            if (prevValues.includes(normalizedValue)) {
+              return prev; // Возвращаем предыдущее состояние без изменений
+            }
+
+            // Создаем новый объект памяти
+            const newMemory = {
+              ...prev,
+              [normalizedKey]: [...prevValues, normalizedValue]
+            };
+
+            // Сохраняем в localStorage
+            try {
+              localStorage.setItem('oracle_memory', JSON.stringify(newMemory));
+            } catch (e) {
+              console.error('Failed to save to localStorage:', e);
+            }
+
+            // Обновляем контекст
+            updateContext(newMemory);
+
+            return newMemory;
+          });
+
+          // Возвращаем подтверждение для ИИ
+          return `@@MEMORY_STORED@@${normalizedKey}:${normalizedValue}`;
+        } catch (error) {
+          console.error('Error in set_memory:', error);
+          return 'Error: Failed to store memory';
+        }
       }
-    },
-    async () => {
-      setMemory({});
-      localStorage.removeItem('oracle_memory');
-      updateContext({});
-      return '';
-    }
-  );
+    );
+
+    client.addTool(
+      {
+        name: 'clear_memory',
+        description: 'Clears all stored memory',
+        parameters: {
+          type: 'object',
+          properties: {},
+          required: []
+        }
+      },
+      async () => {
+        setMemory({});
+        localStorage.removeItem('oracle_memory');
+        updateContext({});
+        return '@@MEMORY_CLEARED@@';
+      }
+    );
+  } catch (error) {
+    console.error('Error setting up tools:', error);
+  }
 };
 
 export function ConsolePage() {
@@ -258,9 +297,29 @@ export function ConsolePage() {
     setIsConnecting(true);
     
     try {
+      // Пересоздаем клиент перед новым подключением
+      clientRef.current = new RealtimeClient(
+        LOCAL_RELAY_SERVER_URL
+          ? { url: LOCAL_RELAY_SERVER_URL }
+          : {
+              apiKey: apiKey,
+              dangerouslyAllowAPIKeyInBrowser: true,
+            }
+      );
+
       const client = clientRef.current;
       const wavRecorder = wavRecorderRef.current;
       const wavStreamPlayer = wavStreamPlayerRef.current;
+
+      // Устанавливаем базовые параметры сессии
+      client.updateSession({ instructions: instructions });
+      client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
+      
+      // Подключаемся к API
+      await client.connect();
+
+      // Настраиваем инструменты
+      setupClientTools(client, setMemory, updateContext);
 
       // Обновляем контекст с текущей памятью
       updateContext(memory);
@@ -275,23 +334,75 @@ export function ConsolePage() {
 
       // Connect to audio output
       await wavStreamPlayer.connect();
-      // @ts-ignore - OpenAI Realtime API Beta types are outdated and don't include all available voices.
-      // 'ash' is a valid voice option according to the latest API but not yet reflected in the type definitions
+      
+      // @ts-ignore
       client.updateSession({ voice: 'ash' });
-
-      // Connect to realtime API
-      await client.connect();
 
       // Automatically set to manual mode
       client.updateSession({ turn_detection: null });
       setCanPushToTalk(true);
       setIsConnected(true);
+
+      // Устанавливаем обработчики событий
+      client.on('realtime.event', (realtimeEvent: RealtimeEvent) => {
+        setRealtimeEvents((realtimeEvents) => {
+          const lastEvent = realtimeEvents[realtimeEvents.length - 1];
+          if (lastEvent?.event.type === realtimeEvent.event.type) {
+            lastEvent.count = (lastEvent.count || 0) + 1;
+            return realtimeEvents.slice(0, -1).concat(lastEvent);
+          } else {
+            return realtimeEvents.concat(realtimeEvent);
+          }
+        });
+      });
+
+      client.on('conversation.updated', async ({ item, delta }: any) => {
+        const items = client.conversation.getItems();
+        
+        // Фильтруем сообщения, оставляя только диалог
+        const filteredItems = items.filter(item => {
+          // Оставляем только сообщения от пользователя и ассистента
+          if (item.role !== 'user' && item.role !== 'assistant') return false;
+          
+          const text = item.formatted?.text;
+          if (!text) return true;
+
+          // Исключаем технические сообщения
+          if (text.includes('@@MEMORY_STORED@@')) return false;
+          if (text.includes('@@MEMORY_CLEARED@@')) return false;
+          if (text.includes('{')) return false;  // JSON объекты
+          if (text.includes('({})')) return false;  // Вызовы функций
+          if (text.includes('Tool')) return false;  // Сообщения об инструментах
+          if (text === '""') return false;  // Пустые строки
+          if (text === '(truncated)') return false;  // Системные сообщения
+
+          // Сохраняем диалог подтверждения очистки памяти
+          if (text.includes('Ты уверен, что хочешь чтобы я забыл')) return true;
+          if (text.toLowerCase() === 'да') return true;
+
+          return true;
+        });
+
+        if (delta?.audio) {
+          wavStreamPlayer.add16BitPCM(delta.audio, item.id);
+        }
+        if (item.status === 'completed' && item.formatted.audio?.length) {
+          const wavFile = await WavRecorder.decode(
+            item.formatted.audio,
+            24000,
+            24000
+          );
+          item.formatted.file = wavFile;
+        }
+        setItems(filteredItems);
+      });
+
     } catch (error) {
       console.error('Connection failed:', error);
     } finally {
       setIsConnecting(false);
     }
-  }, [memory, updateContext]);
+  }, [memory, updateContext, apiKey]); // Добавляем apiKey в зависимости
 
   /**
    * Disconnect and reset conversation state
