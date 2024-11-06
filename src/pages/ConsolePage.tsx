@@ -159,7 +159,8 @@ export function ConsolePage() {
       // Connect to audio output
       await wavStreamPlayer.connect();
 
-      // Set voice to Ash
+      // @ts-ignore - OpenAI Realtime API Beta types are outdated and don't include all available voices.
+      // 'ash' is a valid voice option according to the latest API but not yet reflected in the type definitions
       client.updateSession({ voice: 'ash' });
 
       // Connect to realtime API
