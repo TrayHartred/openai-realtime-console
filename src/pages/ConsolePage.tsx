@@ -19,8 +19,9 @@ import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
 import { instructions } from '../utils/conversation_config.js';
 import { WavRenderer } from '../utils/wav_renderer';
 
-import { X, Edit, Zap, ArrowUp, ArrowDown } from 'react-feather';
+import { X, Edit, Zap, ArrowUp, ArrowDown, Mic } from 'react-feather';
 import { Button } from '../components/button/Button';
+import { Toggle } from '../components/toggle/Toggle';
 
 import './ConsolePage.scss';
 
@@ -96,6 +97,7 @@ export function ConsolePage() {
   }>({});
   const [isConnected, setIsConnected] = useState(false);
   const [canPushToTalk, setCanPushToTalk] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   /**
    * Utility for formatting the timing of logs
@@ -156,16 +158,10 @@ export function ConsolePage() {
 
     // Connect to realtime API
     await client.connect();
-    client.sendUserMessageContent([
-      {
-        type: `input_text`,
-        text: ``,
-      },
-    ]);
 
-    if (client.getTurnDetectionType() === 'server_vad') {
-      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-    }
+    // Automatically set to manual mode
+    client.updateSession({ turn_detection: null });
+    setCanPushToTalk(true);
   }, []);
 
   /**
@@ -352,6 +348,60 @@ export function ConsolePage() {
   }, []);
 
   /**
+   * In push-to-talk mode, start recording
+   * .appendInputAudio() for each sample
+   */
+  const startRecording = async () => {
+    setIsRecording(true);
+    const client = clientRef.current;
+    const wavRecorder = wavRecorderRef.current;
+    const wavStreamPlayer = wavStreamPlayerRef.current;
+    
+    // Interrupt any playing audio
+    const trackSampleOffset = await wavStreamPlayer.interrupt();
+    if (trackSampleOffset?.trackId) {
+      const { trackId, offset } = trackSampleOffset;
+      await client.cancelResponse(trackId, offset);
+    }
+    
+    // Start recording
+    await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+  };
+
+  /**
+   * In push-to-talk mode, stop recording
+   */
+  const stopRecording = async () => {
+    setIsRecording(false);
+    const client = clientRef.current;
+    const wavRecorder = wavRecorderRef.current;
+    await wavRecorder.pause();
+    client.createResponse();
+  };
+
+  /**
+   * Switch between Manual <> VAD mode for communication
+   */
+  const changeTurnEndType = async (value: string) => {
+    const client = clientRef.current;
+    const wavRecorder = wavRecorderRef.current;
+    
+    if (value === 'none' && wavRecorder.getStatus() === 'recording') {
+      await wavRecorder.pause();
+    }
+    
+    client.updateSession({
+      turn_detection: value === 'none' ? null : { type: 'server_vad' },
+    });
+    
+    if (value === 'server_vad' && client.isConnected()) {
+      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+    }
+    
+    setCanPushToTalk(value === 'none');
+  };
+
+  /**
    * Render the application
    */
   return (
@@ -449,6 +499,19 @@ export function ConsolePage() {
             </div>
           </div>
           <div className="content-actions">
+            {isConnected && canPushToTalk && (
+              <>
+                <Button
+                  label={isRecording ? 'release to send' : 'push to talk'}
+                  buttonStyle={isRecording ? 'alert' : 'regular'}
+                  disabled={!isConnected || !canPushToTalk}
+                  onMouseDown={startRecording}
+                  onMouseUp={stopRecording}
+                  onMouseLeave={() => isRecording && stopRecording()}
+                />
+                <div className="spacer" />
+              </>
+            )}
             <Button
               label={isConnected ? 'End session' : 'Start cooking'}
               iconPosition={isConnected ? 'end' : 'start'}
